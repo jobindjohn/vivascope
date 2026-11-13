@@ -30,7 +30,7 @@ and the known dynapost bugs (see §12) must not.
 - Reading `d3plot` or the separate ASCII output files (only `binout` and `d3hsp`).
 - Reading `glstat`, or the global-energy quality checks in VIVA+ `02_*.def`.
 - BrIC and chest deflection. VIVA+ does not define them yet, so they are deferred.
-- Unit conversion beyond simple per-simulation scale factors (see §6).
+- Unit systems other than combinations of the base units listed in §6.
 - A GUI. One is planned later, and the API must not prevent it (see §8).
 - A supported live app. The example notebook (§8.3) is the only interactive
   front end in v0.1.
@@ -158,8 +158,8 @@ Per data section (`matsum`, `rcforc`, `nodout`):
 - **ID filtering:** `id_min`, `id_max` (ID range), and for `nodout` an explicit
   ID list or a CSV file of IDs.
 - **Top-N selection:** show only the N curves with the largest peak.
-- **Per-simulation scaling:** `time_scale`, `mass_scale`, `force_scale`,
-  `energy_scale`.
+- **Per-simulation unit system:** replaces dynapost's `time_scale`,
+  `mass_scale`, `force_scale` and `energy_scale` (§6).
 - **Per-simulation ID offset:** `id_offset`, applied to ID filters and ID lists.
 - **rcforc mode:** master (`m`), slave (`s`), or `both`.
 - **Labels:** curves are labelled `ID_name` or `name_ID` (`id_first`).
@@ -175,12 +175,26 @@ place of raw ID ranges.
 
 ## 6. Units
 
-- vivascope assumes VIVA+ units: **ms, mm, kg**. Derived units are kN, kJ,
-  mm/ms², and so on.
-- The scale factors in §5 are the only conversion. They cover simulations run in
-  other units, as in dynapost.
-- Criteria are computed after scaling, so their inputs are always in VIVA+
-  units.
+- vivascope works internally in VIVA+ units: **ms, mm, kg**. Derived units are
+  kN, kJ, mm/ms, mm/ms², rad/ms², and so on.
+- **Declared unit system:** each simulation has a `units` key of the form
+  `<time>-<length>-<mass>`, for example `s-mm-t`. The default is `ms-mm-kg`.
+  Supported base units: time `s`, `ms`; length `m`, `mm`; mass `kg`, `g`, `t`.
+  Any other value is a config error.
+- **Derived conversions:** every quantity read from `binout` or `d3hsp` (time,
+  displacement, velocity, acceleration, angular acceleration, force, energy,
+  mass) is converted to ms-mm-kg using factors derived from the three base
+  units. There are no independent scale factors, so conversions cannot
+  contradict each other.
+- **Where conversion happens:** in the I/O layer, right after reading (§10).
+  Processing, criteria, plots and CSV export only see ms-mm-kg values.
+- **Conversion to g:** criteria that need acceleration in g (e.g. HIC15) convert
+  inside the criteria layer, with 1 g = 9.81 m/s² = 9.81×10⁻³ mm/ms². Whether
+  `01_units.def` should supply this target system instead of the fixed value is
+  decided by the `.def` spike (§14).
+- **dynapost keys:** `time_scale`, `mass_scale`, `force_scale` and
+  `energy_scale` are config errors, with a message that points to `units`.
+- The report header shows each simulation's declared unit system.
 
 ## 7. Configuration
 
@@ -194,7 +208,7 @@ place of raw ID ranges.
   unless the section overrides them. In dynapost they were documented but never
   applied.
 - **Per-simulation overrides:** a list of simulations, each with `path`,
-  `label`, `variant`, scale factors, ID offsets, and section-level overrides.
+  `label`, `variant`, `units`, ID offsets, and section-level overrides.
 - **No machine-specific paths** in shipped example configs.
 - vivascope ships a default config. Running with no config file must produce a
   sensible report.
@@ -241,8 +255,8 @@ Planned after v0.1. Not specified here.
   (zoom, hover, toggle curves). Which plotting library to use is an open
   question (§14).
 - **Sections:**
-  1. Header: simulations included, with label, path, model variant and `.def`
-     source.
+  1. Header: simulations included, with label, path, model variant, unit
+     system and `.def` source.
   2. Warnings: everything skipped or failed, prefixed by simulation label.
   3. Run info: per-simulation table from d3hsp.
   4. Mass: total and filtered mass, number of parts, added-mass ratio plot.
@@ -286,6 +300,9 @@ All processed DataFrames, and a table of criteria results, written as CSV.
 - **Real simulation data** is too large to publish and stays local. Integration
   tests that need it are skipped in CI unless an environment variable points to
   local reference results.
+- **Unit conversion tests:** every supported unit system converts a synthetic
+  data set back to the same ms-mm-kg values, and criteria results do not
+  depend on the declared unit system.
 - **Dynasaur comparison** (nice to have): a local script that runs Dynasaur in a
   separate environment on the same reference simulations and compares criteria
   values with vivascope's, within stated tolerances.
@@ -297,7 +314,7 @@ All processed DataFrames, and a table of criteria results, written as CSV.
 | dynapost issue | Requirement in vivascope |
 |---|---|
 | `warning_list` typo crashes the single report when matsum is disabled | Each section is isolated; tests cover disabled sections |
-| Compare mode applies `mass_scale` to added mass but not to total mass, so the ratio is wrong | Scaling is applied consistently to both values of every ratio |
+| Compare mode applies `mass_scale` to added mass but not to total mass, so the ratio is wrong | Unit conversion happens once, at read time, for every value (§6) |
 | Top-N ranks by signed max, so negative forces are under-ranked | Top-N ranks by absolute peak (rcforc: resultant) |
 | Top-N picked separately per x/y/z direction | One selection per entity, shared across directions |
 | `None` vs `null` mismatch in per-sim overrides | One value parser (§7) |
@@ -331,3 +348,6 @@ All processed DataFrames, and a table of criteria results, written as CSV.
 6. Author names for `pyproject.toml` / `CITATION.cff`.
 7. Tolerances for the Dynasaur comparison (§11).
 8. BrIC and chest deflection: definitions and source, for a release after v0.1.
+9. Can `01_units.def` serve as the criteria's target unit system and g
+   constant, instead of the fixed values in §6? To be answered by the `.def`
+   spike.
