@@ -21,6 +21,8 @@ and the known dynapost bugs (see §12) must not.
   model (Dynasaur `.def` files).
 - Produce a shareable static HTML report with interactive plots, and export the
   processed data to CSV.
+- Ship an example marimo notebook that uses the public API for interactive
+  exploration (§8.3).
 - Install with `pip install vivascope`.
 
 ### Non-goals (v0.1)
@@ -30,6 +32,8 @@ and the known dynapost bugs (see §12) must not.
 - BrIC and chest deflection. VIVA+ does not define them yet, so they are deferred.
 - Unit conversion beyond simple per-simulation scale factors (see §6).
 - A GUI. One is planned later, and the API must not prevent it (see §8).
+- A supported live app. The example notebook (§8.3) is the only interactive
+  front end in v0.1.
 - Verified agreement with Dynasaur output. This is a goal but not a release gate
   (see §11).
 
@@ -214,11 +218,16 @@ place of raw ID ranges.
 - Results are returned as plain data (pandas DataFrames / dataclasses), separate
   from plotting. A future GUI then needs no changes to the core.
 
-### 8.3 Live app
+### 8.3 Example notebook
 
-A local interactive app for changing filters and selections and seeing the
-results update. Which technology to use (marimo, Streamlit, Dash, …) is an open
-question (§14).
+- A marimo notebook in `examples/` with widgets for changing filters and
+  selections and seeing the results update.
+- It uses only the public API (§8.2). If it needs anything else, the API is
+  missing something and must be fixed in the core, not in the notebook.
+- It is an example, not a supported interface: no stability promise, and it is
+  not installed with the package. marimo is not a vivascope dependency.
+- A supported live app and its technology are decided after v0.1, together with
+  the GUI (§14).
 
 ### 8.4 GUI
 
@@ -253,17 +262,14 @@ Planned after v0.1. Not specified here.
 
 All processed DataFrames, and a table of criteria results, written as CSV.
 
-### 9.3 Live app
-
-See §8.3.
-
 ## 10. Architecture and dependencies
 
 - Plain Python package with a `src/` layout. Notebooks are not used as library
   code (unlike dynapost's marimo `functions.py`).
 - Layers kept separate: **I/O** (binout, d3hsp, `.def`) → **processing**
   (filtering, scaling, top-N, derived quantities) → **criteria** (`.def`
-  interpreter and functions) → **presentation** (plots, HTML report, live app).
+  interpreter and functions) → **presentation** (plots, HTML report). The
+  example notebook sits outside the package and calls the public API.
 - **Python:** follows `lasso-python`. As of `lasso-python` 2.0.4 that is
   Python ≥ 3.11 with numpy > 2.2.
 - Dependencies are declared exactly as used. dynapost's undeclared `pyyaml` and
@@ -283,6 +289,8 @@ See §8.3.
 - **Dynasaur comparison** (nice to have): a local script that runs Dynasaur in a
   separate environment on the same reference simulations and compares criteria
   values with vivascope's, within stated tolerances.
+- **Example notebook:** CI runs it headless on synthetic data so that API
+  changes that break it are caught.
 
 ## 12. dynapost issues that must not carry over
 
@@ -308,13 +316,14 @@ See §8.3.
 - **Authors:** the original dynapost authors are listed as authors in
   `pyproject.toml` and `CITATION.cff`. **TODO: names.**
 - **Docs:** README only for v0.1. It covers installation, a quickstart (CLI and
-  API), a config reference, the list of criteria with their references, and how
-  to cite.
+  API), a config reference, the list of criteria with their references, how to
+  run the example notebook, and how to cite.
 
 ## 14. Open questions
 
 1. Plotting library for interactive plots (plotly, Bokeh, Altair, …).
-2. Live-app technology (marimo, Streamlit, Dash, …).
+2. Technology for the supported live app / GUI after v0.1 (marimo, Streamlit,
+   Dash, …). Not needed for v0.1.
 3. CLI command names and flags.
 4. Should the `.def` `DATA VISUALIZATION` sections drive plots in the report?
 5. Is bundling LGPL-3.0 `.def` files in an Apache-2.0 package acceptable as
